@@ -1,0 +1,196 @@
+<html>
+  <head>
+    <title>Describe Scene</title>
+    <!-- simpleamt depends on these libraries -->
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/jquery/2.1.1/jquery.min.js'></script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/json3/3.3.2/json3.min.js'></script>
+    <!-- end of required libraries -->
+    <script src='https://maxcdn.bootstrapcdn.com/bootstrap/3.2.0/js/bootstrap.min.js'></script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/underscore.js/1.6.0/underscore-min.js'></script>
+    <link href="https://maxcdn.bootstrapcdn.com/bootstrap/3.2.0/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+      textarea {
+        margin: 5px 0!important;
+        font-size: 16pt!important;
+      }
+      #button-div {
+        margin-bottom: 10px;
+      }
+      #counter {
+        margin: 0 10px;
+        font-size: 20pt;
+        font-weight: bold;
+      }
+      img {
+        height: 200px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class='container'>
+      <h3>Describe character position and pose</h3>
+      <h4>
+      The goal of this task is to describe where a particular character is and how they're posed in a scene.
+      </h4>
+        <ul>
+          <li>Select Pose: Describe how the character is posed from the options in the menu.</li>
+          <li>
+            Select Position: This field should
+            describe where the character is in the scene relative to an object you choose.
+          </li>
+          <li>
+           Enter an object: The object you choose should be an object that is large and obvious that
+           is also close to the character.
+          </li>
+          <li>
+            Here's an example of the task:
+            <a href='https://s3-us-west-2.amazonaws.com//ai2-vision-animation-gan/annotation_data/interface_elems/instructions_stage_1/example_boxes.gif'>
+              examples of the tasks
+            </a>
+          </li>
+        </ul>
+          <br>
+      <br>
+        <img id='image_frame'
+        src='{{image_url}}'>
+      <hr>
+    </div>
+
+    <div class='container-fluid'>
+      <div class='row' style="float: left; width: 50%;">
+        <div class='col-lg-4 text-center'>
+            <img id='char_img'
+            src='{{char_img}}'>
+          <br>
+        </div>
+      </div>
+      <div class='row' style="float: right; width: 50%;">
+        <div class='col-lg-4 col-lg-offset-4'>
+          <h4>
+            The character shown to the left is
+          </h4>
+          <h4>
+            <select id="Pose">
+              {% for item in pose_select%}
+                <option  value="{{item}}">{{item}}</option>
+              {% endfor %}
+            </select>
+        </h4>
+        <h4>
+          <select id="Position">
+            {% for item in position_select%}
+              <option  value="{{item}}">{{item}}</option>
+            {% endfor %}
+          </select>
+        </h4>
+        <h4>
+          <input id="Objects" name="Objects" type="text" placeholder='Enter an Object' />
+        </h4>
+        <h4>
+          in the frame above.
+        </h4>
+        <br>
+        </div>
+      </div>
+    </div>
+
+    {% include "simpleamt.html" %}
+
+    <script>
+        // Define some default input.
+        var DEFAULT_INPUT = [
+        {{image_uris}}
+        ];
+
+        var input = null;
+
+        // Descriptions of images, parallel to input.
+        var descriptions = [];
+
+        // Some variables to track state of the HIT.
+        var idx = 0;
+        var enabled = false;
+
+        function main() {
+          // If this is a HIT on AMT, then replace the default input with the real input.
+          input = simpleamt.getInput(DEFAULT_INPUT);
+
+          // Enable the UI if the HIT is not in preview mode.
+          if (!simpleamt.isPreview()) {
+            enable_hit();
+          }
+
+          // Set up the descriptions.
+          _.each(input, function() { descriptions.push(''); });
+
+          // Preload all images
+          var imgs = [];
+          _.each(input, function(img_url) {
+            var img = new Image();
+            img.onload = function() { console.log('loaded image from ' + img_url); };
+            img.src = img_url;
+          });
+
+          render();
+        }
+
+        // Use the current index to update the image and description
+        function render() {
+          // Set up the image
+          $('#image-container').empty();
+          $('<img>').attr('src', input[idx]).appendTo($('#image-container'));
+
+          // Set up the text area
+          // $('#setting').val(descriptions[1]);
+          // $('#objects').val(descriptions[2]);
+          // $('#actions').val(descriptions[3]);
+
+          // Refresh the counter
+          <!--$('.counter-top').text(idx + 1);-->
+          <!--$('.counter-bottom').text(input.length);-->
+
+        }
+
+        // Enable the UI.
+        function enable_hit() {
+          enabled = true;
+
+          // Enable components
+          <!--$('#next-btn').click(function() { set_idx(idx + 1) });-->
+          <!--$('#prev-btn').click(function() { set_idx(idx - 1) });-->
+          $('#Pose').prop('disabled', false);
+          $('#Position').prop('disabled', false);
+          $('#Objects').prop('disabled', false);
+          $('#submit-btn').prop('disabled', false);
+
+          // Set up submit handler.
+          simpleamt.setupSubmit();
+          $('#submit-btn').click(function() {
+            var obj = document.getElementById("Objects");
+            descriptions[0] = $('#Pose').val();
+            descriptions[1] = $('#Position').val();
+            descriptions[2] = $('#Objects').val();
+            if (_.any(descriptions, function(d) { return d.length < 0; })) {
+              alert('Descriptions not long enough. Correct before submitting.');
+              return false;
+            }
+            // var output = _.map(_.zip(input, descriptions), function(x) {
+            //   return {'char_id': x[0], 'description': x[1]};
+            // });
+            var char_uri = '{{char_img}}'
+            var char_img = char_uri.substring(char_uri.lastIndexOf("/") + 1, char_uri.length);
+            var char_id = char_img.substring(0, char_img.lastIndexOf("_"));
+
+            output = {'char_id': char_id,
+            'pose': descriptions[0],
+            'position': descriptions[1],
+            'objects': descriptions[2]
+            }
+            // console.log(output);
+            simpleamt.setOutput(output);
+          });
+        }
+        main();
+    </script>
+  </body>
+</html>
